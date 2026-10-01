@@ -1,4 +1,4 @@
-const TRACKER_URL = 'https://us.forums.blizzard.com/en/wow/g/blizzard-tracker/activity/posts.json';
+const TRACKER_URL = 'https://us.forums.blizzard.com/en/wow/groups/blizzard-tracker/posts.json';
 const FORUM_BASE = 'https://us.forums.blizzard.com/en/wow';
 const CATEGORY_ID = 349;
 const STATE_PREFIX = 'ForeverBlueposts:last=';
@@ -19,8 +19,13 @@ function plain(text = '') {
 }
 
 function trackerPosts(data) {
-  const direct = data?.post_stream?.posts || data?.posts;
+  const direct =
+    data?.latest_posts ||
+    data?.post_stream?.posts ||
+    data?.posts;
+
   if (Array.isArray(direct)) return direct;
+
   if (Array.isArray(data?.user_actions)) {
     return data.user_actions.map((a) => a?.post || {
       id: a.post_id,
@@ -29,10 +34,12 @@ function trackerPosts(data) {
       username: a.username,
       name: a.name,
       excerpt: a.excerpt,
+      cooked: a.cooked,
       created_at: a.created_at,
       slug: a.slug,
     }).filter((p) => p?.id && p?.topic_id);
   }
+
   return [];
 }
 
@@ -40,7 +47,7 @@ async function getJson(url) {
   const r = await fetch(url, {
     headers: {
       accept: 'application/json',
-      'user-agent': 'ForeverBluepostDiscord/1.0 (+GitHub Actions)',
+      'user-agent': 'ForeverBluepostDiscord/1.1 (+GitHub Actions)',
     },
   });
   if (!r.ok) throw new Error(`${url} -> HTTP ${r.status}`);
@@ -54,7 +61,7 @@ function parseWebhookState(webhook) {
 
 async function getWebhook(url) {
   const r = await fetch(url, {
-    headers: { 'user-agent': 'ForeverBluepostDiscord/1.0 (+GitHub Actions)' },
+    headers: { 'user-agent': 'ForeverBluepostDiscord/1.1 (+GitHub Actions)' },
   });
   if (!r.ok) throw new Error(`Discord webhook metadata -> HTTP ${r.status}`);
   return r.json();
@@ -65,7 +72,7 @@ async function setWebhookState(url, postId) {
     method: 'PATCH',
     headers: {
       'content-type': 'application/json',
-      'user-agent': 'ForeverBluepostDiscord/1.0 (+GitHub Actions)',
+      'user-agent': 'ForeverBluepostDiscord/1.1 (+GitHub Actions)',
     },
     body: JSON.stringify({ name: `${STATE_PREFIX}${postId}` }),
   });
@@ -94,7 +101,7 @@ async function sendDiscord(url, post, topic) {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'user-agent': 'ForeverBluepostDiscord/1.0 (+GitHub Actions)',
+      'user-agent': 'ForeverBluepostDiscord/1.1 (+GitHub Actions)',
     },
     body: JSON.stringify(payload),
   });
@@ -115,8 +122,8 @@ async function main() {
     .sort((a, b) => Number(a.id) - Number(b.id));
 
   if (!posts.length) {
-    console.log('Blue Tracker returned no posts.');
-    return;
+    const keys = tracker && typeof tracker === 'object' ? Object.keys(tracker).join(', ') : typeof tracker;
+    throw new Error(`Blue Tracker returned no parseable posts. Top-level keys: ${keys}`);
   }
 
   const lastSeen = parseWebhookState(webhook);
