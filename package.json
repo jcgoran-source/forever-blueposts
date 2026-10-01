@@ -1,0 +1,11 @@
+{
+  "name": "forever-blueposts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node check.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
