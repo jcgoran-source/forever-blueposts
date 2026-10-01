@@ -3,16 +3,49 @@ const FORUM_BASE = 'https://us.forums.blizzard.com/en/wow';
 const CATEGORY_ID = 349;
 const STATE_PREFIX = 'ForeverBlueposts:last=';
 
+const NAMED_ENTITIES = {
+  nbsp: ' ',
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  hellip: '…',
+  ndash: '–',
+  mdash: '—',
+  lsquo: '‘',
+  rsquo: '’',
+  ldquo: '“',
+  rdquo: '”',
+};
+
+function decodeHtmlEntities(text = '') {
+  return String(text).replace(
+    /&(#(?:x[0-9a-f]+|\d+)|[a-z][a-z0-9]+);/gi,
+    (match, entity) => {
+      if (entity[0] === '#') {
+        const hex = entity[1]?.toLowerCase() === 'x';
+        const value = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10);
+        if (Number.isInteger(value) && value >= 0 && value <= 0x10ffff) {
+          try {
+            return String.fromCodePoint(value);
+          } catch {
+            return match;
+          }
+        }
+        return match;
+      }
+      return NAMED_ENTITIES[entity.toLowerCase()] ?? match;
+    },
+  );
+}
+
 function plain(text = '') {
-  return String(text)
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
+  return decodeHtmlEntities(
+    String(text)
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, ' '),
+  )
     .replace(/[ \t]+/g, ' ')
     .replace(/\n\s+/g, '\n')
     .trim();
@@ -47,7 +80,7 @@ async function getJson(url) {
   const r = await fetch(url, {
     headers: {
       accept: 'application/json',
-      'user-agent': 'ForeverBluepostDiscord/1.1 (+GitHub Actions)',
+      'user-agent': 'ForeverBluepostDiscord/1.2 (+GitHub Actions)',
     },
   });
   if (!r.ok) throw new Error(`${url} -> HTTP ${r.status}`);
@@ -61,7 +94,7 @@ function parseWebhookState(webhook) {
 
 async function getWebhook(url) {
   const r = await fetch(url, {
-    headers: { 'user-agent': 'ForeverBluepostDiscord/1.1 (+GitHub Actions)' },
+    headers: { 'user-agent': 'ForeverBluepostDiscord/1.2 (+GitHub Actions)' },
   });
   if (!r.ok) throw new Error(`Discord webhook metadata -> HTTP ${r.status}`);
   return r.json();
@@ -72,7 +105,7 @@ async function setWebhookState(url, postId) {
     method: 'PATCH',
     headers: {
       'content-type': 'application/json',
-      'user-agent': 'ForeverBluepostDiscord/1.1 (+GitHub Actions)',
+      'user-agent': 'ForeverBluepostDiscord/1.2 (+GitHub Actions)',
     },
     body: JSON.stringify({ name: `${STATE_PREFIX}${postId}` }),
   });
@@ -87,7 +120,7 @@ async function sendDiscord(url, post, topic) {
     username: 'Forever Blueposts',
     allowed_mentions: { parse: [] },
     embeds: [{
-      title: String(topic.title || 'New Blizzard post').slice(0, 256),
+      title: plain(topic.title || 'New Blizzard post').slice(0, 256),
       url: pageUrl,
       description: description || 'New Blizzard post in the WoW: Forever Beta forum.',
       author: { name: post.name || post.username || 'Blizzard' },
@@ -101,7 +134,7 @@ async function sendDiscord(url, post, topic) {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'user-agent': 'ForeverBluepostDiscord/1.1 (+GitHub Actions)',
+      'user-agent': 'ForeverBluepostDiscord/1.2 (+GitHub Actions)',
     },
     body: JSON.stringify(payload),
   });
